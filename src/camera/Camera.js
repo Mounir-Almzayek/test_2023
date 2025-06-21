@@ -8,7 +8,7 @@ export class Camera {
 
         // Camera settings with our unit system
         this.height = Units.toProjectUnits(2); // 2 meters height
-        this.speed = Units.toProjectUnits(2); // 2 meters per second
+        this.speed = Units.toProjectUnits(1); // 1 meters per second
         this.angle = 0; // Rotation angle around Y axis
         this.pitch = 0; // Look up/down angle
         this.roll = 0;  // Side tilt angle

@@ -5,9 +5,188 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Three.js Project</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Orbitron font for sci-fi style -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
+    <style>
+      .hud {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .hud-frame {
+        border: 2px solid rgba(0, 255, 255, 0.5);
+        padding: 0 32px 28px 32px;
+        width: 370px;
+        backdrop-filter: blur(4px);
+        background: linear-gradient(135deg, rgba(0,255,255,0.08) 0%, rgba(0,40,60,0.18) 100%);
+        box-shadow: 0 0 18px rgba(0, 255, 255, 0.35);
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        border-radius: 18px;
+        overflow: hidden;
+      }
+      .hud-header {
+        background: linear-gradient(90deg, rgba(0,255,255,0.18) 0%, rgba(0,180,255,0.25) 100%);
+        color: #fff;
+        text-shadow: 0 0 8px #0ff, 0 0 2px #0ff;
+        font-size: 22px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        padding: 18px 0 12px 0;
+        text-align: center;
+        border-bottom: 2px solid rgba(0,255,255,0.18);
+        margin-bottom: 10px;
+        position: relative;
+      }
+      .rocket-status-label {
+        font-size: 15px;
+        font-weight: 500;
+        opacity: 0.7;
+        margin-right: 8px;
+      }
+      .rocket-status-value {
+        font-size: 20px;
+        font-weight: bold;
+        color: #0ff;
+        text-shadow: 0 0 6px #0ff;
+        letter-spacing: 1px;
+      }
+      .hud-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 2px;
+        border-bottom: 1px solid rgba(0,255,255,0.08);
+      }
+      .hud-row:last-child {
+        border-bottom: none;
+      }
+      .label {
+        font-size: 18px;
+        opacity: 0.8;
+        letter-spacing: 1px;
+      }
+      .value {
+        font-size: 30px;
+        font-weight: bold;
+        text-align: right;
+        min-width: 110px;
+      }
+      .units {
+        font-size: 15px;
+        margin-left: 4px;
+        opacity: 0.6;
+      }
+      .slider-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .slider-label {
+        font-size: 16px;
+        opacity: 0.8;
+        letter-spacing: 1px;
+      }
+      .slider-value {
+        font-size: 22px;
+        font-weight: bold;
+        color: #0ff;
+        min-width: 60px;
+        text-align: right;
+      }
+      .slider {
+        flex: 1;
+        margin: 0 10px;
+        accent-color: #0ff;
+        height: 4px;
+      }
+      .hud, .hud * {
+        font-family: 'Orbitron', sans-serif !important;
+        color: #0ff !important;
+      }
+    </style>
 </head>
 <body>
     <canvas id="scene"></canvas>
+    <div class="hud">
+      <div class="hud-frame">
+        <div class="hud-header">
+          <span class="rocket-status-label">Rocket Status:</span>
+          <span class="rocket-status-value" id="rocket-status">Ready</span>
+        </div>
+        <div class="hud-row">
+          <span class="label">Time</span>
+          <span class="value"><span id="time">0.0</span><span class="units"> s</span></span>
+        </div>
+        <div class="hud-row">
+          <span class="label">Altitude</span>
+          <span class="value"><span id="altitude">0.0</span><span class="units"> m</span></span>
+        </div>
+        <div class="hud-row">
+          <span class="label">Speed</span>
+          <span class="value"><span id="speed">0.0</span><span class="units"> m/s</span></span>
+        </div>
+        <div class="hud-row">
+          <span class="label">Acceleration</span>
+          <span class="value"><span id="accel">0.0</span><span class="units"> m/s²</span></span>
+        </div>
+        <div class="hud-row">
+          <span class="label">Current Mass</span>
+          <span class="value"><span id="mass">20000</span><span class="units"> kg</span></span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.js"></script>
+    <script type="module">
+      import { getStageLabel } from './src/constants/ShuttleStages.js';
+
+      function updateHUD() {
+        console.log('updateHUD running', window.scene);
+        if (!window.scene || !scene.spaceShuttle || typeof scene.spaceShuttle.getAltitude !== 'function' || !scene.shuttlePhysics) {
+          document.getElementById("rocket-status").textContent = 'Unknown';
+          document.getElementById("time").textContent = '0.0';
+          document.getElementById("speed").textContent = '0.0';
+          document.getElementById("accel").textContent = '0.0';
+          document.getElementById("mass").textContent = '0';
+          document.getElementById("altitude").textContent = '0.0';
+          requestAnimationFrame(updateHUD);
+          return;
+        }
+        const physics = scene.shuttlePhysics;
+        const shuttle = scene.spaceShuttle;
+        console.log('HUD:', {
+          time: physics ? physics.time : 'no physics',
+          speed: physics && physics.velocity ? physics.velocity.length() : 'no velocity',
+          accel: physics && physics.acceleration ? physics.acceleration.length() : 'no accel',
+          mass: physics ? physics.calculateTotalMass() : 'no mass',
+          altitude: shuttle.getAltitude(),
+          wind: physics ? physics.wind : 'no wind',
+        });
+        document.getElementById("time").textContent = (physics ? (physics.time || 0) : 0).toFixed(1);
+        document.getElementById("speed").textContent = (physics ? (physics.velocity ? physics.velocity.length() : 0) : 0).toFixed(1);
+        document.getElementById("accel").textContent = (physics ? (physics.acceleration ? physics.acceleration.length() : 0) : 0).toFixed(1);
+        if (physics && typeof physics.stage !== 'undefined') {
+          document.getElementById("rocket-status").textContent = getStageLabel(physics.stage);
+        } else {
+          document.getElementById("rocket-status").textContent = 'Unknown';
+        }
+        document.getElementById("mass").textContent = physics ? physics.calculateTotalMass().toFixed(0) : '0';
+        document.getElementById("altitude").textContent = shuttle.getAltitude().toFixed(1);
+        requestAnimationFrame(updateHUD);
+      }
+      updateHUD();
+
+      document.getElementById("wind-slider").addEventListener("input", function(e) {
+        if (window.scene && scene.shuttlePhysics) {
+          scene.shuttlePhysics.wind = parseFloat(e.target.value);
+        }
+      });
+    </script>
 </body>
 </html> 

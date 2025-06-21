@@ -5,6 +5,7 @@ import { LaunchPad } from '../objects/LaunchPad';
 import { SpaceShuttle } from '../objects/SpaceShuttle';
 import { WaterObject } from '../objects/Water';
 import { Units } from '../utils/Units';
+import { ShuttlePhysics } from '../physics/ShuttlePhysics';
 
 export class MainScene {
     constructor() {
@@ -14,6 +15,7 @@ export class MainScene {
             antialias: true
         });
         this.isInitialized = false;
+        this.shuttlePhysics = new ShuttlePhysics();
         this.init();
     }
 
@@ -66,7 +68,7 @@ export class MainScene {
             }
 
             // Add Space Shuttle
-            this.spaceShuttle = new SpaceShuttle(this.earth);
+            this.spaceShuttle = new SpaceShuttle(this.earth, this.shuttlePhysics);
             const shuttleModel = await this.spaceShuttle.load();
             if (shuttleModel) {
                 this.scene.add(shuttleModel);

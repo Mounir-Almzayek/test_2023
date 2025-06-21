@@ -37,21 +37,17 @@ export class LaunchPad {
             this.model = await this.loadModel('/models/rocket_laucher_pad/launch_site.glb');
 
             // Scale the model to be 500 meters tall
-            const targetHeight = Units.toProjectUnits(600); // 600 meters
+            const targetHeight = Units.toProjectUnits(55); // 55 meters
             const box = new THREE.Box3().setFromObject(this.model);
             const currentHeight = box.max.y - box.min.y;
             const scale = targetHeight / currentHeight;
             this.model.scale.set(scale, scale, scale);
 
-            // Position at camera location (2 meters above surface)
-            const height = Units.toProjectUnits(-50); // 50 meters height
+            // Position at camera location
             const radius = this.earth.getRadius();
-            this.model.position.set(0, radius + height, 0);
+            this.model.position.set(0, radius, 0);
 
-            // Add point light to the launch pad
-            const light = new THREE.PointLight(0xffffff, 1, Units.toProjectUnits(1000));
-            light.position.set(0, Units.toProjectUnits(100), 0);
-            this.model.add(light);
+
 
             console.log('Launch pad loaded successfully');
             return this.model;

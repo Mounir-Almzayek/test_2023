@@ -25,6 +25,7 @@ export class ShuttlePhysics {
 
         // Remaining fuel percentage (starts at 100%)
         this.fuel = 100;
+        this.time = 0;
     }
 
     /**
@@ -187,6 +188,8 @@ export class ShuttlePhysics {
 
         // Update stage based on conditions
         this.updateStage();
+
+        this.time += deltaTime;
     }
 
     /**

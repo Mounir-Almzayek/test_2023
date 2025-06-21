@@ -5,7 +5,7 @@ import { ShuttlePhysics } from '../physics/ShuttlePhysics';
 import { ShuttleStages } from '../constants/ShuttleStages';
 
 export class SpaceShuttle {
-    constructor(earth) {
+    constructor(earth, physics) {
         this.earth = earth;
         this.model = null;
         this.rotationSpeed = 0;
@@ -17,7 +17,7 @@ export class SpaceShuttle {
         this.rocket2 = null;
 
         // Initialize physics system
-        this.physics = new ShuttlePhysics();
+        this.physics = physics;
 
         // Store initial position and rotation
         this.initialPosition = null;
@@ -82,15 +82,15 @@ export class SpaceShuttle {
             this.model.add(this.rocket2);
 
             // Scale the entire group
-            const targetHeight = Units.toProjectUnits(400); // 400 meters height
+            const targetHeight = Units.toProjectUnits(45.46); // 45.46 meters height
             const box = new THREE.Box3().setFromObject(this.model);
             const currentHeight = box.max.y - box.min.y;
             const scale = targetHeight / currentHeight;
             this.model.scale.set(scale, scale, scale);
 
             // Position the entire group
-            const height = Units.toProjectUnits(145); // 145 meters height
-            const width = Units.toProjectUnits(-210); // 130 meters width
+            const height = Units.toProjectUnits(22); // 22 meters height
+            const width = Units.toProjectUnits(-24); // -24 meters width
             const radius = this.earth.getRadius();
             this.model.position.set(0, radius + height, width);
 
@@ -101,10 +101,6 @@ export class SpaceShuttle {
             // Initialize physics with initial position
             this.physics.position.copy(this.initialPosition);
 
-            // Add point light to the shuttle
-            const light = new THREE.PointLight(0xffffff, 1, Units.toProjectUnits(1000));
-            light.position.set(0, Units.toProjectUnits(100), 0);
-            this.model.add(light);
 
             console.log('Space shuttle loaded successfully');
             return this.model;
@@ -206,5 +202,10 @@ export class SpaceShuttle {
 
     dispose() {
         window.removeEventListener('keydown', this.handleKeyDown);
+    }
+
+    getAltitude() {
+        if (!this.model || !this.initialPosition) return 0;
+        return this.model.position.y - this.initialPosition.y;
     }
 } 

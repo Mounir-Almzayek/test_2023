@@ -70,7 +70,7 @@ export class WaterObject {
         };
 
         // Position water at launch pad level
-        this.water.position.y = this.radius + Units.toProjectUnits(-70); // Slightly above Earth's surface
+        this.water.position.y = this.radius + Units.toProjectUnits(-3); // Slightly above Earth's surface
     }
 
     update() {

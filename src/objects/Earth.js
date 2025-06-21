@@ -13,7 +13,7 @@ export class Earth {
 
     createEarth() {
         // Create Earth mesh with scaled radius
-        const geometry = new THREE.SphereGeometry(this.radius, 260, 260);
+        const geometry = new THREE.SphereGeometry(this.radius, 718, 718);
 
         // Load textures
         const textureLoader = new THREE.TextureLoader();
