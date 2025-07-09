@@ -3,6 +3,7 @@ export const PhysicsConstants = {
     EARTH_RADIUS: 6371000, // meters
     EARTH_MASS: 5.972e24, // kg
     GRAVITY_CONSTANT: 6.67430e-11, // m³/kg/s²
+    GRAVITY: 9.81, // m/s²
 
     // Atmosphere constants
     ATMOSPHERE_HEIGHT: 100000, // meters

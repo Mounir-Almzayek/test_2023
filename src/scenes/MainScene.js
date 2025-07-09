@@ -74,6 +74,10 @@ export class MainScene {
                 this.scene.add(shuttleModel);
             }
 
+            // Add AxesHelper to visualize X (red), Y (green), Z (blue) axes
+            const axesHelper = new THREE.AxesHelper(Units.toProjectUnits(20)); // 20 meters long
+            this.scene.add(axesHelper);
+
             // Setup camera
             this.camera = new Camera(this.earth);
 

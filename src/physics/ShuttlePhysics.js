@@ -13,6 +13,10 @@ export class ShuttlePhysics {
         this.acceleration = new THREE.Vector3();
         this.force = new THREE.Vector3();
 
+        this.currentThrust = 0;
+        this.maxThrust = PhysicsConstants.THRUST_MAIN_ENGINES + 2 * PhysicsConstants.THRUST_SOLID_ROCKETS;
+        this.thrustRampRate = this.maxThrust / 40;
+
         // Component masses
         this.shuttleMass = PhysicsConstants.SHUTTLE_MASS;
         this.fuelTankMass = PhysicsConstants.FUEL_TANK_MASS;
@@ -83,22 +87,26 @@ export class ShuttlePhysics {
      * @returns {THREE.Vector3} Air resistance force vector
      */
     calculateAirResistance(velocity, altitude) {
-        // No air resistance above atmosphere
         if (altitude > PhysicsConstants.ATMOSPHERE_HEIGHT) {
             return new THREE.Vector3();
         }
 
-        // Calculate air density (decreases with altitude)
         const airDensity = PhysicsConstants.AIR_DENSITY_SEA_LEVEL *
             Math.exp(-altitude * PhysicsConstants.AIR_DENSITY_DECAY_RATE);
 
-        // Drag coefficient and cross-sectional area
         const dragCoefficient = 0.5;
         const crossSectionalArea = 100; // m²
 
-        // Calculate drag force
-        const dragForce = 0.5 * airDensity * dragCoefficient * crossSectionalArea *
-            velocity.lengthSq();
+        const speedSq = velocity.lengthSq();
+        if (speedSq === 0 || !isFinite(speedSq)) {
+            return new THREE.Vector3();
+        }
+
+        const dragForce = 0.5 * airDensity * dragCoefficient * crossSectionalArea * speedSq;
+        const norm = velocity.length();
+        if (norm === 0 || !isFinite(norm)) {
+            return new THREE.Vector3();
+        }
         return velocity.clone().normalize().multiplyScalar(-dragForce);
     }
 
@@ -151,37 +159,64 @@ export class ShuttlePhysics {
     /**
      * Update physics simulation for the current frame
      * @param {number} deltaTime - Time elapsed since last frame in seconds
-     */
-    update(deltaTime) {
-        // Reset total force
-        this.force.set(0, 0, 0);
-
-        // // Add gravitational force
-        // this.force.add(this.calculateGravityForce(this.position));
-
-        // // Add normal force if in IDLE stage (on launch pad)
-        // if (this.stage === ShuttleStages.IDLE) {
+    */
+   update(deltaTime) {
+       // Reset total force
+       this.force.set(0, 0, 0);
+       const currentMass = this.calculateTotalMass();
+       
+       // // Add gravitational force
+       // this.force.add(this.calculateGravityForce(this.position));
+       
+       // // Add normal force if in IDLE stage (on launch pad)
+       // if (this.stage === ShuttleStages.IDLE) {
         //     this.force.add(this.calculateNormalForce());
         // }
-
+        
         // // Add air resistance if in atmosphere
         // const altitude = this.position.length() - PhysicsConstants.EARTH_RADIUS;
         // this.force.add(this.calculateAirResistance(this.velocity, altitude));
-
+        
         // Add thrust force based on current stage
-        this.force.add(this.calculateThrust(this.stage));
-
+        
         // Calculate acceleration (F = ma) using current total mass
-        const currentMass = this.calculateTotalMass();
-        this.acceleration.copy(this.force).divideScalar(currentMass);
-
+        
         // Update velocity (v = v0 + at)
-        this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
-
+        
         // Update position (p = p0 + vt)
-        this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
-
+        
         // Update fuel consumption
+        
+        switch (this.stage) {
+            case ShuttleStages.LIFTOFF: {
+                this.currentThrust = Math.min(this.currentThrust + this.thrustRampRate * deltaTime, this.maxThrust);
+                let thrust = new THREE.Vector3(0, this.currentThrust, 0);
+
+                this.force.add(thrust);
+                this.force.add(this.calculateWeightForce());
+                this.force.add(this.calculateNormalForce());
+                // Calculate altitude for air resistance
+                const altitude = this.position.length() - PhysicsConstants.EARTH_RADIUS;
+                this.force.add(this.calculateAirResistance(this.velocity, altitude));
+                
+                if (this.force.y >= 0) {
+                }
+                this.acceleration.copy(this.force).divideScalar(currentMass);
+                this.velocity.add(this.acceleration.clone().multiplyScalar(deltaTime));
+                this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
+                break;
+            }
+            case ShuttleStages.ATMOSPHERIC_ASCENT: {
+                break;
+            }
+            case ShuttleStages.ORBITAL_INSERTION: {
+                break;
+            }
+            case ShuttleStages.ORBITAL_STABILIZATION: {
+                break;
+            }
+        }
+        
         if (this.stage !== ShuttleStages.IDLE) {
             this.fuel = Math.max(0, this.fuel - PhysicsConstants.FUEL_CONSUMPTION_RATE * deltaTime);
         }
