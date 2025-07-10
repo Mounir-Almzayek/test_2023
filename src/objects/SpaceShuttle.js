@@ -1,8 +1,11 @@
+// src/components/SpaceShuttle.js
+
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { Units } from '../utils/Units';
 import { ShuttlePhysics } from '../physics/ShuttlePhysics';
 import { ShuttleStages } from '../constants/ShuttleStages';
+import { PhysicsConstants } from '../constants/PhysicsConstants'; // Import PhysicsConstants here too
 
 export class SpaceShuttle {
     constructor(earth, physics) {
@@ -19,9 +22,9 @@ export class SpaceShuttle {
         // Initialize physics system
         this.physics = physics;
 
-        // Store initial position and rotation
-        this.initialPosition = null;
-        this.initialRotation = new THREE.Euler(-Math.PI / 2, 0, -Math.PI / 2);
+        // Store initial position and rotation (for IDLE stage)
+        this.initialModelPosition = null; // The visual model's initial position in Three.js units
+        this.initialModelRotation = new THREE.Euler(-Math.PI / 2, 0, -Math.PI / 2); // Point upward (Y-axis for Three.js model)
 
         // Bind the key handler to this instance
         this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -58,51 +61,63 @@ export class SpaceShuttle {
             // Load space shuttle in the middle
             this.shuttle = await this.loadModel('/models/space_shuttle/space_shuttle.glb',
                 { x: 0, y: 0, z: 0 },
-                { x: -Math.PI / 2, y: 0, z: -Math.PI } // Point upward
+                { x: -Math.PI / 2, y: 0, z: -Math.PI } // Point upward relative to its own local axis
             );
             this.model.add(this.shuttle);
 
             // Load fuel tank
             this.fuelTank = await this.loadModel('/models/fuel_tank/fuel_tank.glb',
                 { x: 0, y: 0, z: 0 },
-                { x: -Math.PI / 2, y: 0, z: -Math.PI } // Point upward
+                { x: -Math.PI / 2, y: 0, z: -Math.PI }
             );
             this.model.add(this.fuelTank);
 
             // Load rockets
             this.rocket1 = await this.loadModel('/models/rocket/rocket_1.glb',
                 { x: 0, y: 0, z: 0 },
-                { x: -Math.PI / 2, y: 0, z: -Math.PI } // Point upward
+                { x: -Math.PI / 2, y: 0, z: -Math.PI }
             );
             this.rocket2 = await this.loadModel('/models/rocket/rocket_2.glb',
                 { x: 0, y: 0, z: 0 },
-                { x: -Math.PI / 2, y: 0, z: -Math.PI } // Point upward
+                { x: -Math.PI / 2, y: 0, z: -Math.PI }
             );
             this.model.add(this.rocket1);
             this.model.add(this.rocket2);
 
-            // Scale the entire group
-            const targetHeight = Units.toProjectUnits(45.46); // 45.46 meters height
+            // Scale the entire group to match a target real-world height
+            const targetRealHeightMeters = 45.46; // Real height of Space Shuttle stack in meters
             const box = new THREE.Box3().setFromObject(this.model);
-            const currentHeight = box.max.y - box.min.y;
-            const scale = targetHeight / currentHeight;
-            this.model.scale.set(scale, scale, scale);
+            const currentModelHeight = box.max.y - box.min.y; // Height of the loaded model in its own scale
+            const scaleFactor = Units.toProjectUnits(targetRealHeightMeters) / currentModelHeight;
+            this.model.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
-            // Position the entire group
-            const height = Units.toProjectUnits(22); // 22 meters height
-            const width = Units.toProjectUnits(-24); // -24 meters width
-            const radius = this.earth.getRadius();
-            this.model.position.set(0, radius + height, width);
+            // --- Set Initial Position for the Visual Model (in Project Units) ---
+            // The shuttle starts on the launch pad at Earth's surface.
+            // We need to define its initial offset from Earth's center in project units.
+            const initialShuttleHeightFromSurfaceMeters = 22; // Approx height of shuttle base from ground
+            const initialShuttleWidthOffsetMeters = -24; // Z-offset for visual presentation if needed
 
-            // Store initial position and rotation
-            this.initialPosition = this.model.position.clone();
-            this.initialRotation = this.model.rotation.clone();
+            // Calculate initial Y position (radius of Earth in project units + shuttle's initial height from surface in project units)
+            const initialModelYPosition = this.earth.getRadius() + Units.toProjectUnits(initialShuttleHeightFromSurfaceMeters);
+            const initialModelZPosition = Units.toProjectUnits(initialShuttleWidthOffsetMeters);
 
-            // Initialize physics with initial position
-            this.physics.position.copy(this.initialPosition);
+            this.model.position.set(0, initialModelYPosition, initialModelZPosition);
 
+            // Store initial model position and rotation for the IDLE stage
+            this.initialModelPosition = this.model.position.clone();
+            this.initialModelRotation = this.model.rotation.clone();
+
+
+            // --- Initialize Physics Position (in Real Meters from Earth's center) ---
+            // The physics engine operates in real meters.
+            // PhysicsConstants.EARTH_RADIUS is already in real meters.
+            const initialPhysicsYPosition = PhysicsConstants.EARTH_RADIUS + initialShuttleHeightFromSurfaceMeters;
+            this.physics.position.set(0, initialPhysicsYPosition, 0); // Physics usually starts directly "up" from center
 
             console.log('Space shuttle loaded successfully');
+            console.log(`Initial Visual Model Position (Project Units): ${this.initialModelPosition.toArray().map(v => v.toFixed(2))}`);
+            console.log(`Initial Physics Position (Real Meters): ${this.physics.position.toArray().map(v => v.toFixed(2))}`);
+
             return this.model;
         } catch (error) {
             console.error('Error loading space shuttle model:', error);
@@ -122,78 +137,69 @@ export class SpaceShuttle {
         if (this.model) {
             if (this.physics.stage === ShuttleStages.IDLE) {
                 // Rocket is stationary on launch pad
-                this.model.position.copy(this.initialPosition);
-                this.model.rotation.copy(this.initialRotation);
+                this.model.position.copy(this.initialModelPosition);
+                this.model.rotation.copy(this.initialModelRotation);
             } else {
-                // Update physics
+                // Update physics simulation
                 this.physics.update(deltaTime);
 
-                // Update model position based on physics
-                // Scale the movement to make it more visible
-                const scaledPosition = this.physics.position.clone();
-                scaledPosition.y = this.initialPosition.y + (this.physics.position.y - this.initialPosition.y) * 10;
-                this.model.position.copy(scaledPosition);
+                // --- Update Model Position based on Physics (converting from Real Meters to Project Units) ---
+                // this.physics.position is in real meters (from Earth's center).
+                // this.model.position should be in project units.
 
-                // Maintain the original rotation
-                this.model.rotation.copy(this.initialRotation);
+                const physicsPositionInProjectUnits = new THREE.Vector3(
+                    Units.toProjectUnits(this.physics.position.x),
+                    Units.toProjectUnits(this.physics.position.y),
+                    Units.toProjectUnits(this.physics.position.z)
+                );
+                
+                // Keep X and Z fixed to initial launch pad position during vertical ascent stages
+                if (this.physics.stage === ShuttleStages.LIFTOFF || this.physics.stage === ShuttleStages.ATMOSPHERIC_ASCENT) {
+                    this.model.position.x = this.initialModelPosition.x; // Keep initial X
+                    this.model.position.y = physicsPositionInProjectUnits.y; // Update Y from physics
+                    this.model.position.z = this.initialModelPosition.z; // Keep initial Z
+                } else {
+                    // For orbital stages and beyond, allow full 3D movement from physics
+                    this.model.position.copy(physicsPositionInProjectUnits);
+                }
 
-                // Handle stage-specific effects
+                // For a more dynamic orientation during flight, you might want to adjust rotation
+                // based on velocity or acceleration, but for now, keep initial upward rotation.
+                this.model.rotation.copy(this.initialModelRotation);
+
+                // Handle stage-specific effects (visuals, sounds, camera, etc.)
                 switch (this.physics.stage) {
                     case ShuttleStages.LIFTOFF:
-                        // Launch Phase
-                        // - Engine sound starts gradually
-                        // - Light fire effect for several seconds
-                        // - Fire intensity increases significantly
-                        // - Fire effect stabilizes with increasing altitude
-                        // - Add smoke effect
-                        // - Camera shake due to pressure
-                        // - Strong air resistance effects
-                        // - Breaking the sound barrier
+                        // Example: Add engine exhaust effects, camera shake.
+                        // You'd typically add a ParticleEmitter for smoke/fire here.
                         break;
-
                     case ShuttleStages.ATMOSPHERIC_ASCENT:
-                        // Atmospheric Ascent Phase
-                        // - Engines at full power
-                        // - Fire effect decreases due to lower air density
-                        // - Continuous smoke effects
-                        // - Gradual speed increase
-                        // - Noticeable decrease in air resistance
-                        // - Reaching 90km altitude
-                        // - Booster rockets separation after 2.5 minutes
-                        // - Removal of fire and smoke effects from boosters
+                        // Example: Adjust exhaust size/intensity based on air density (altitude).
+                        // Handle SRB detachment visual event.
+                        if (this.physics.srbDetached && this.rocket1.parent) {
+                            this.model.remove(this.rocket1);
+                            this.model.remove(this.rocket2);
+                            console.log("Visual: SRBs removed from scene.");
+                            // Add logic to make SRBs fall separately if you had a separate physics for them
+                        }
                         break;
-
                     case ShuttleStages.ORBITAL_INSERTION:
-                        // Orbital Insertion Phase
-                        // - Reaching 100km altitude
-                        // - Reducing main engine thrust
-                        //   (due to mass reduction from booster separation and fuel consumption)
-                        // - No air resistance effects
-                        // - External tank separation
+                        // Example: Reduce main engine exhaust.
+                        // Handle ET detachment visual event.
+                        if (this.physics.etDetached && this.fuelTank.parent) {
+                            this.model.remove(this.fuelTank);
+                            console.log("Visual: External Fuel Tank removed from scene.");
+                            // Add logic for ET falling/burning up
+                        }
                         break;
-
                     case ShuttleStages.ORBITAL_STABILIZATION:
-                        // Orbital Stabilization Phase
-                        // - Main engines shutdown
-                        // - Simulating satellite-like motion
-                        // - Exiting Earth's orbit
+                        // No active thrust, subtle adjustments.
                         break;
-
                     case ShuttleStages.FREE_SPACE_MOTION:
-                        // Free Space Motion Phase
-                        // - Free motion in space
-                        // - Influenced only by gravitational forces
-                        //   (planets, moon, and nearby celestial bodies)
-                        // - No propulsion forces
+                        // No thrust, just orbit.
                         break;
-
                     case ShuttleStages.ORBITAL_MANEUVERING:
-                        // Orbital Maneuvering Phase
-                        // - Re-engaging engines
-                        // - Applying thrust force
-                        // - Changing velocity and direction
-                        // - Orbital changes
-                        //   (entering and exiting different orbits)
+                        // Small thruster bursts effects.
                         break;
                 }
             }
@@ -205,7 +211,8 @@ export class SpaceShuttle {
     }
 
     getAltitude() {
-        if (!this.model || !this.initialPosition) return 0;
-        return this.model.position.y - this.initialPosition.y;
+        // Returns the current altitude in real meters, as calculated by the physics engine.
+        // This is the distance from the Earth's surface, not from the center.
+        return this.physics.position.y - PhysicsConstants.EARTH_RADIUS;
     }
-} 
+}
